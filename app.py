@@ -39,81 +39,84 @@ def resolve_stream():
 
     print(f'Resolving: {url}', flush=True)
 
-    clients = ['tv_embedded', 'web_embedded', 'android_embedded', 'ios']
-    last_error = None
+    try:
+        opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'skip_download': True,
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['tv_embedded'],
+                }
+            },
+            'youtube_include_dash_manifest': False,
+        }
+        if COOKIE_FILE:
+            opts['cookiefile'] = COOKIE_FILE
 
-    for client in clients:
-        try:
-            print(f'Trying client: {client}', flush=True)
-            opts = {
-                'quiet': True,
-                'no_warnings': True,
-                'skip_download': True,
-                'extractor_args': {
-                    'youtube': {
-                        'player_client': [client],
-                        }
-                },
-            }
-            if COOKIE_FILE:
-                opts['cookiefile'] = COOKIE_FILE
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=False)
 
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                info = ydl.extract_info(url, download=False)
+        formats = info.get('formats', [])
 
-            formats = info.get('formats', [])
-            audio_formats = [
-                f for f in formats
-                if f.get('vcodec') == 'none' and f.get('acodec') != 'none' and f.get('url')
-            ]
-            best_audio = max(audio_formats, key=lambda f: f.get('abr') or f.get('tbr') or 0) if audio_formats else None
-            audio_url = best_audio['url'] if best_audio else None
+        print(f"Total formats: {len(formats)}", flush=True)
+        for f in formats:
+            print(f"  id={f.get('format_id')} acodec={f.get('acodec')} vcodec={f.get('vcodec')} url={'YES' if f.get('url') else 'NO'} abr={f.get('abr')}", flush=True)
 
-            if not audio_url:
-                last_error = f'No direct audio URL from {client}'
-                print(last_error, flush=True)
-                continue
+        audio_formats = [
+            f for f in formats
+            if f.get('vcodec') == 'none' and f.get('acodec') != 'none' and f.get('url')
+        ]
+        best_audio = max(audio_formats, key=lambda f: f.get('abr') or f.get('tbr') or 0) if audio_formats else None
+        audio_url = best_audio['url'] if best_audio else None
 
-            video_formats = [
-                f for f in formats
-                if f.get('acodec') == 'none' and f.get('vcodec') != 'none' and f.get('url') and f.get('height')
-            ]
-            best_video = next((f for f in video_formats if f.get('height') == 720), None) or \
-                         (max(video_formats, key=lambda f: f.get('height') or 0) if video_formats else None)
-            video_url = best_video['url'] if best_video else None
+        if not audio_url:
+            # Try any format with a url
+            any_format = next((f for f in formats if f.get('url')), None)
+            audio_url = any_format['url'] if any_format else None
 
-            muxed_formats = [
-                f for f in formats
-                if f.get('vcodec') != 'none' and f.get('acodec') != 'none' and f.get('url') and f.get('height')
-            ]
-            best_muxed = max(muxed_formats, key=lambda f: f.get('height') or 0) if muxed_formats else None
-            muxed_url = best_muxed['url'] if best_muxed else None
+        if not audio_url:
+            return jsonify({'success': False, 'error': 'No direct URL found in any format', 'audioUrl': None,
+                            'videoUrl': None, 'muxedVideoUrl': None, 'duration': 0,
+                            'title': info.get('title', ''), 'uploaderUrl': None,
+                            'likeCount': -1, 'viewCount': -1})
 
-            print(f"Resolved via {client}: {info.get('title')} ({info.get('duration')}s)", flush=True)
+        video_formats = [
+            f for f in formats
+            if f.get('acodec') == 'none' and f.get('vcodec') != 'none' and f.get('url') and f.get('height')
+        ]
+        best_video = next((f for f in video_formats if f.get('height') == 720), None) or \
+                     (max(video_formats, key=lambda f: f.get('height') or 0) if video_formats else None)
+        video_url = best_video['url'] if best_video else None
 
-            return jsonify({
-                'success': True,
-                'audioUrl': audio_url,
-                'videoUrl': video_url,
-                'muxedVideoUrl': muxed_url,
-                'duration': info.get('duration') or 0,
-                'title': info.get('title') or '',
-                'uploaderUrl': info.get('uploader_url') or None,
-                'likeCount': info.get('like_count') or -1,
-                'viewCount': info.get('view_count') or -1,
-            })
+        muxed_formats = [
+            f for f in formats
+            if f.get('vcodec') != 'none' and f.get('acodec') != 'none' and f.get('url') and f.get('height')
+        ]
+        best_muxed = max(muxed_formats, key=lambda f: f.get('height') or 0) if muxed_formats else None
+        muxed_url = best_muxed['url'] if best_muxed else None
 
-        except Exception as e:
-            last_error = str(e)
-            print(f'Client {client} failed: {e}', flush=True)
-            continue
+        print(f"Resolved: {info.get('title')} ({info.get('duration')}s)", flush=True)
 
-    return jsonify({'success': False, 'error': last_error, 'audioUrl': None,
-                    'videoUrl': None, 'muxedVideoUrl': None, 'duration': 0,
-                    'title': '', 'uploaderUrl': None, 'likeCount': -1, 'viewCount': -1})
+        return jsonify({
+            'success': True,
+            'audioUrl': audio_url,
+            'videoUrl': video_url,
+            'muxedVideoUrl': muxed_url,
+            'duration': info.get('duration') or 0,
+            'title': info.get('title') or '',
+            'uploaderUrl': info.get('uploader_url') or None,
+            'likeCount': info.get('like_count') or -1,
+            'viewCount': info.get('view_count') or -1,
+        })
+
+    except Exception as e:
+        print(f'Resolution failed: {e}', flush=True)
+        return jsonify({'success': False, 'error': str(e), 'audioUrl': None,
+                        'videoUrl': None, 'muxedVideoUrl': None, 'duration': 0,
+                        'title': '', 'uploaderUrl': None, 'likeCount': -1, 'viewCount': -1})
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
     print(f'Starting on port {port}', flush=True)
     app.run(host='0.0.0.0', port=port)
-
