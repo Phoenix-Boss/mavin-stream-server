@@ -9,7 +9,7 @@ app = Flask(__name__)
 def get_cookie_file():
     b64 = os.environ.get('YT_COOKIES_B64')
     if not b64:
-        print('No YT_COOKIES_B64 env var found', flush=True)
+        print('No YT_COOKIES_B64 found', flush=True)
         return None
     try:
         data = base64.b64decode(b64)
@@ -23,23 +23,6 @@ def get_cookie_file():
         return None
 
 COOKIE_FILE = get_cookie_file()
-
-def get_opts():
-    opts = {
-        'quiet': True,
-        'no_warnings': True,
-        'skip_download': True,
-        'remote_components': 'ejs:github',
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['tv_embedded'],
-            }
-        },
-    }
-    if COOKIE_FILE:
-        opts['cookiefile'] = COOKIE_FILE
-        print('Using cookies', flush=True)
-    return opts
 
 @app.route('/health', methods=['GET', 'HEAD'])
 def health():
@@ -56,7 +39,7 @@ def resolve_stream():
 
     print(f'Resolving: {url}', flush=True)
 
-    clients = ['tv_embedded', 'web_embedded', 'ios', 'android_embedded']
+    clients = ['tv_embedded', 'web_embedded', 'android_embedded', 'ios']
     last_error = None
 
     for client in clients:
@@ -66,10 +49,10 @@ def resolve_stream():
                 'quiet': True,
                 'no_warnings': True,
                 'skip_download': True,
-        'remote_components': 'ejs:github',
                 'extractor_args': {
                     'youtube': {
                         'player_client': [client],
+                        'player_skip': ['webpage', 'configs'],
                     }
                 },
             }
@@ -134,4 +117,3 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
     print(f'Starting on port {port}', flush=True)
     app.run(host='0.0.0.0', port=port)
-
