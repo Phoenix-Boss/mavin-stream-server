@@ -1,4 +1,3 @@
-
 # yt-dlp[default] includes yt-dlp-ejs (the JS challenge solver component)
 # required for YouTube since yt-dlp 2025.11.12.
 # Without [default], YouTube format extraction may fail or be incomplete.
