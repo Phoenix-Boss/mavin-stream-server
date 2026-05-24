@@ -44,7 +44,6 @@ def resolve_stream():
             'quiet': True,
             'no_warnings': True,
             'skip_download': True,
-            'format': 'bestaudio/best',
             'extractor_args': {
                 'youtube': {
                     'player_client': ['tv_embedded'],
@@ -116,4 +115,5 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
     print(f'Starting on port {port}', flush=True)
     app.run(host='0.0.0.0', port=port)
+
 
