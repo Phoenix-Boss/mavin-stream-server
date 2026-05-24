@@ -52,8 +52,7 @@ def resolve_stream():
                 'extractor_args': {
                     'youtube': {
                         'player_client': [client],
-                        'player_skip': ['webpage', 'configs'],
-                    }
+                        }
                 },
             }
             if COOKIE_FILE:
@@ -117,3 +116,4 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
     print(f'Starting on port {port}', flush=True)
     app.run(host='0.0.0.0', port=port)
+
