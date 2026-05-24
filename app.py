@@ -1,0 +1,99 @@
+import os
+import yt_dlp
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
+
+COOKIE_FILE = os.environ.get('COOKIE_PATH', '/etc/secrets/cookies.txt')
+
+def get_opts():
+    opts = {
+        'quiet': True,
+        'no_warnings': True,
+        'skip_download': True,
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['web'],
+            }
+        },
+    }
+    if os.path.exists(COOKIE_FILE):
+        opts['cookiefile'] = COOKIE_FILE
+        print('Using cookies.txt', flush=True)
+    else:
+        print('No cookies.txt found', flush=True)
+    return opts
+
+@app.route('/health', methods=['GET', 'HEAD'])
+def health():
+    return 'OK', 200
+
+@app.route('/resolve-stream', methods=['POST'])
+def resolve_stream():
+    body = request.get_json()
+    url = (body or {}).get('url')
+    if not url:
+        return jsonify({'success': False, 'error': 'Missing url', 'audioUrl': None,
+                        'videoUrl': None, 'muxedVideoUrl': None, 'duration': 0,
+                        'title': '', 'uploaderUrl': None, 'likeCount': -1, 'viewCount': -1})
+
+    print(f'Resolving: {url}', flush=True)
+
+    try:
+        with yt_dlp.YoutubeDL(get_opts()) as ydl:
+            info = ydl.extract_info(url, download=False)
+
+        formats = info.get('formats', [])
+
+        audio_formats = [
+            f for f in formats
+            if f.get('vcodec') == 'none' and f.get('acodec') != 'none' and f.get('url')
+        ]
+        best_audio = max(audio_formats, key=lambda f: f.get('abr') or f.get('tbr') or 0) if audio_formats else None
+        audio_url = best_audio['url'] if best_audio else info.get('url')
+
+        video_formats = [
+            f for f in formats
+            if f.get('acodec') == 'none' and f.get('vcodec') != 'none' and f.get('url') and f.get('height')
+        ]
+        best_video = next((f for f in video_formats if f.get('height') == 720), None) or \
+                     (max(video_formats, key=lambda f: f.get('height') or 0) if video_formats else None)
+        video_url = best_video['url'] if best_video else None
+
+        muxed_formats = [
+            f for f in formats
+            if f.get('vcodec') != 'none' and f.get('acodec') != 'none' and f.get('url') and f.get('height')
+        ]
+        best_muxed = max(muxed_formats, key=lambda f: f.get('height') or 0) if muxed_formats else None
+        muxed_url = best_muxed['url'] if best_muxed else None
+
+        if not audio_url:
+            return jsonify({'success': False, 'error': 'No audio stream found', 'audioUrl': None,
+                            'videoUrl': None, 'muxedVideoUrl': None, 'duration': 0,
+                            'title': info.get('title', ''), 'uploaderUrl': None,
+                            'likeCount': -1, 'viewCount': -1})
+
+        print(f"Resolved: {info.get('title')} ({info.get('duration')}s)", flush=True)
+
+        return jsonify({
+            'success': True,
+            'audioUrl': audio_url,
+            'videoUrl': video_url,
+            'muxedVideoUrl': muxed_url,
+            'duration': info.get('duration') or 0,
+            'title': info.get('title') or '',
+            'uploaderUrl': info.get('uploader_url') or None,
+            'likeCount': info.get('like_count') or -1,
+            'viewCount': info.get('view_count') or -1,
+        })
+
+    except Exception as e:
+        print(f'Resolution failed: {e}', flush=True)
+        return jsonify({'success': False, 'error': str(e), 'audioUrl': None,
+                        'videoUrl': None, 'muxedVideoUrl': None, 'duration': 0,
+                        'title': '', 'uploaderUrl': None, 'likeCount': -1, 'viewCount': -1})
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 10000))
+    print(f'Starting on port {port}', flush=True)
+    app.run(host='0.0.0.0', port=port)
