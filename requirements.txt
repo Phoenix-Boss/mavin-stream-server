@@ -1,3 +1,10 @@
-yt-dlp
-yt-dlp-invidious
-flask
+
+# yt-dlp[default] includes yt-dlp-ejs (the JS challenge solver component)
+# required for YouTube since yt-dlp 2025.11.12.
+# Without [default], YouTube format extraction may fail or be incomplete.
+yt-dlp[default]>=2025.11.12
+
+flask>=3.0.0
+
+# Production WSGI server (use instead of flask dev server)
+gunicorn>=22.0.0
