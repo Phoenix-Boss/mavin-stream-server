@@ -1,10 +1,28 @@
 import os
 import yt_dlp
+import tempfile
+import base64
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-COOKIE_FILE = os.environ.get('COOKIE_PATH', '/etc/secrets/cookies.txt')
+def get_cookie_file():
+    b64 = os.environ.get('YT_COOKIES_B64')
+    if not b64:
+        print('No YT_COOKIES_B64 env var found', flush=True)
+        return None
+    try:
+        data = base64.b64decode(b64)
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.txt', mode='wb')
+        tmp.write(data)
+        tmp.flush()
+        print(f'Cookies written to {tmp.name}', flush=True)
+        return tmp.name
+    except Exception as e:
+        print(f'Failed to decode cookies: {e}', flush=True)
+        return None
+
+COOKIE_FILE = get_cookie_file()
 
 def get_opts():
     opts = {
@@ -17,11 +35,9 @@ def get_opts():
             }
         },
     }
-    if os.path.exists(COOKIE_FILE):
+    if COOKIE_FILE:
         opts['cookiefile'] = COOKIE_FILE
-        print('Using cookies.txt', flush=True)
-    else:
-        print('No cookies.txt found', flush=True)
+        print('Using cookies', flush=True)
     return opts
 
 @app.route('/health', methods=['GET', 'HEAD'])
