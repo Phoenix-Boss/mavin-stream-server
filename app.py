@@ -44,12 +44,12 @@ def resolve_stream():
             'quiet': True,
             'no_warnings': True,
             'skip_download': True,
+            'format': 'bestaudio/best',
             'extractor_args': {
                 'youtube': {
                     'player_client': ['tv_embedded'],
                 }
             },
-            'youtube_include_dash_manifest': False,
         }
         if COOKIE_FILE:
             opts['cookiefile'] = COOKIE_FILE
@@ -58,25 +58,21 @@ def resolve_stream():
             info = ydl.extract_info(url, download=False)
 
         formats = info.get('formats', [])
-
         print(f"Total formats: {len(formats)}", flush=True)
-        for f in formats:
-            print(f"  id={f.get('format_id')} acodec={f.get('acodec')} vcodec={f.get('vcodec')} url={'YES' if f.get('url') else 'NO'} abr={f.get('abr')}", flush=True)
+
+        # Print first 5 formats for debugging
+        for f in formats[:5]:
+            print(f"  id={f.get('format_id')} acodec={f.get('acodec')} vcodec={f.get('vcodec')} has_url={bool(f.get('url'))} abr={f.get('abr')}", flush=True)
 
         audio_formats = [
             f for f in formats
             if f.get('vcodec') == 'none' and f.get('acodec') != 'none' and f.get('url')
         ]
         best_audio = max(audio_formats, key=lambda f: f.get('abr') or f.get('tbr') or 0) if audio_formats else None
-        audio_url = best_audio['url'] if best_audio else None
+        audio_url = best_audio['url'] if best_audio else info.get('url')
 
         if not audio_url:
-            # Try any format with a url
-            any_format = next((f for f in formats if f.get('url')), None)
-            audio_url = any_format['url'] if any_format else None
-
-        if not audio_url:
-            return jsonify({'success': False, 'error': 'No direct URL found in any format', 'audioUrl': None,
+            return jsonify({'success': False, 'error': 'No direct audio URL found', 'audioUrl': None,
                             'videoUrl': None, 'muxedVideoUrl': None, 'duration': 0,
                             'title': info.get('title', ''), 'uploaderUrl': None,
                             'likeCount': -1, 'viewCount': -1})
