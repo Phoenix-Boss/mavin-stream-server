@@ -41,9 +41,10 @@ def resolve_stream():
 
     try:
         opts = {
-            'quiet': True,
-            'no_warnings': True,
+            'quiet': False,
+            'no_warnings': False,
             'skip_download': True,
+            'allow_unplayable_formats': True,
             'extractor_args': {
                 'youtube': {
                     'player_client': ['tv_embedded'],
@@ -58,9 +59,7 @@ def resolve_stream():
 
         formats = info.get('formats', [])
         print(f"Total formats: {len(formats)}", flush=True)
-
-        # Print first 5 formats for debugging
-        for f in formats[:5]:
+        for f in formats[:10]:
             print(f"  id={f.get('format_id')} acodec={f.get('acodec')} vcodec={f.get('vcodec')} has_url={bool(f.get('url'))} abr={f.get('abr')}", flush=True)
 
         audio_formats = [
@@ -71,7 +70,8 @@ def resolve_stream():
         audio_url = best_audio['url'] if best_audio else info.get('url')
 
         if not audio_url:
-            return jsonify({'success': False, 'error': 'No direct audio URL found', 'audioUrl': None,
+            print(f"No direct audio URL. All format urls: {[bool(f.get('url')) for f in formats]}", flush=True)
+            return jsonify({'success': False, 'error': 'No direct audio URL — all streams cipher protected', 'audioUrl': None,
                             'videoUrl': None, 'muxedVideoUrl': None, 'duration': 0,
                             'title': info.get('title', ''), 'uploaderUrl': None,
                             'likeCount': -1, 'viewCount': -1})
@@ -115,5 +115,3 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
     print(f'Starting on port {port}', flush=True)
     app.run(host='0.0.0.0', port=port)
-
-
