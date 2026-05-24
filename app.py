@@ -29,6 +29,7 @@ def get_opts():
         'quiet': True,
         'no_warnings': True,
         'skip_download': True,
+        'remote_components': 'ejs:github',
         'extractor_args': {
             'youtube': {
                 'player_client': ['tv_embedded'],
@@ -65,6 +66,7 @@ def resolve_stream():
                 'quiet': True,
                 'no_warnings': True,
                 'skip_download': True,
+        'remote_components': 'ejs:github',
                 'extractor_args': {
                     'youtube': {
                         'player_client': [client],
@@ -132,3 +134,4 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
     print(f'Starting on port {port}', flush=True)
     app.run(host='0.0.0.0', port=port)
+
